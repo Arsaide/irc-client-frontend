@@ -1,0 +1,11 @@
+.DS_Store
+*.swp
+*~
+.AppleDouble
+.LSOverride
+UserInterfaceState.xcuserstate
+Breakpoints_v2.xcbkptlist
+xcuserdata/
+DerivedData/
+*.moved-aside
+*.xcuserstate
