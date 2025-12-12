@@ -5,7 +5,7 @@ struct LoginRequest: Encodable {
     let password: String
 }
 
-struct User: Codable, Identifiable {
+struct User: Codable, Identifiable, Equatable {
     let id: String
     let email: String
     let name: String

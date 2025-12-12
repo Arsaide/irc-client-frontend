@@ -4,6 +4,7 @@ import SwiftUI
 struct IRCClientApp: App {
     @State private var confirmationToken: String?
     @State private var isShowingConfirmation = false
+    @State private var isLoggedIn = false
 
     var body: some Scene {
         WindowGroup {
@@ -11,11 +12,17 @@ struct IRCClientApp: App {
                 EmailConfirmationView(token: token) {
                     self.confirmationToken = nil
                 }
+            } else if isLoggedIn {
+                HomeView(onLogout: {
+                    isLoggedIn = false
+                })
             } else {
-                LoginView()
-                    .onOpenURL { url in
-                        handleDeepLink(url)
-                    }
+                LoginView(onLoginSuccess: {
+                    isLoggedIn = true
+                })
+                .onOpenURL { url in
+                    handleDeepLink(url)
+                }
             }
         }
     }
@@ -29,7 +36,7 @@ struct IRCClientApp: App {
         
         if components.path == "/auth/email-confirmation" {
             if let token = components.queryItems?.first(where: { $0.name == "token" })?.value {
-                print("🔑 Token found: \(token)")
+                print("Token found: \(token)")
                 self.confirmationToken = token
             }
         }

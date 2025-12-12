@@ -5,6 +5,8 @@ struct LoginView: View {
     
     @State private var openRegistration = false
     
+    var onLoginSuccess: (() -> Void)?
+    
     var body: some View {
         VStack(spacing: 25) {
             Image(systemName: "lock.shield")
@@ -55,7 +57,7 @@ struct LoginView: View {
             
             if let user = viewModel.loggedInUser {
                 VStack {
-                    Text("✅ Success!")
+                    Text("Success!")
                         .font(.headline)
                         .foregroundStyle(.green)
                     Text("Logged in as \(user.name)")
@@ -72,6 +74,13 @@ struct LoginView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text(viewModel.errorMessage ?? "Unknown error")
+        }
+        .onChange(of: viewModel.loggedInUser) { oldValue, newValue in
+            if newValue != nil {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    onLoginSuccess?()
+                }
+            }
         }
     }
 }

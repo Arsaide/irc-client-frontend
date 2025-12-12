@@ -19,7 +19,6 @@ nonisolated extension BackendErrorResponse: Decodable {
         statusCode = try? container.decode(Int.self, forKey: .statusCode)
         error = try? container.decodeIfPresent(String.self, forKey: .error)
         
-        // Универсальное чтение сообщения (и как строки, и как массива)
         if let stringMessage = try? container.decode(String.self, forKey: .message) {
             message = stringMessage
         } else if let arrayMessage = try? container.decode([String].self, forKey: .message) {

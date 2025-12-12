@@ -61,9 +61,3 @@ class AuthService: AuthServiceProtocol {
         }
     }
 }
-
-class ServiceFactory {
-    static func makeAuthService() -> AuthServiceProtocol {
-        return AuthService()
-    }
-}
