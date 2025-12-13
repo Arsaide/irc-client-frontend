@@ -43,16 +43,16 @@ struct ContentView: View {
         NetworkManager.shared.performRequest(request) { result in
             switch result {
             case .success(_):
-                self.serverMessage = "✅ Server is Online!"
+                self.serverMessage = "Server is Online!"
                 self.statusColor = .green
             case .failure(let error):
                 let nsError = error as NSError
                 
                 if nsError.domain == "ServerError" {
-                     self.serverMessage = "⚠️ Server replied with error \(nsError.code) (It's alive!)"
+                     self.serverMessage = "Server replied with error \(nsError.code) (It's alive!)"
                      self.statusColor = .orange
                 } else {
-                    self.serverMessage = "❌ Failed: \(error.localizedDescription)"
+                    self.serverMessage = "Failed: \(error.localizedDescription)"
                     self.statusColor = .red
                 }
             }

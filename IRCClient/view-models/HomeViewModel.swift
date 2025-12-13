@@ -4,10 +4,9 @@ import Combine
 class HomeViewModel: BaseViewModel {
     @Published var currentUser: User?
     @Published var chats: [Chat] = []
-    
     @Published var showCreateChatSheet = false
     @Published var showInviteSheet = false
-    @Published var selectedChatForInvite: Chat?
+    var selectedChatForInvite: Chat?
     
     private let userService = ServiceFactory.makeUserService()
     private let chatService = ServiceFactory.makeChatService()
@@ -42,6 +41,29 @@ class HomeViewModel: BaseViewModel {
             
             group.notify(queue: .main) {
                 onComplete()
+            }
+        }
+    }
+    
+    func createChat(title: String) {
+        performAsyncAction { [weak self] onComplete in
+            guard let self = self else { return }
+            
+            self.chatService.createChat(title: title) { result in
+                onComplete()
+                
+                switch result {
+                case .success(let chat):
+                    DispatchQueue.main.async {
+                        self.chats.append(chat)
+                        self.showCreateChatSheet = false
+                    }
+                    print("Chat created: \(chat)")
+                case .failure(let error):
+                    DispatchQueue.main.async {
+                        self.showError("Failed to create chat: \(error.localizedDescription)")
+                    }
+                }
             }
         }
     }

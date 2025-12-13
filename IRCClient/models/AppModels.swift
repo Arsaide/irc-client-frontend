@@ -13,14 +13,19 @@ struct MessageUser: Codable, Sendable {
     let ircNickname: String?
 }
 
-struct Message: Codable, Identifiable, Sendable {
+struct Message: Codable, Identifiable {
     let id: String
     let text: String
-    let createdAt: String
+    let chatId: String
     let user: MessageUser
+    let createdAt: String
 }
 
 struct SendMessageDto: Encodable {
     let target: String
     let message: String
+}
+
+struct SendChatMessageDto: Encodable {
+    let text: String
 }

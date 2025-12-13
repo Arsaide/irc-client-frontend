@@ -11,6 +11,7 @@ struct HomeView: View {
     var body: some View {
         NavigationSplitView {
             sidebarView
+                .navigationSplitViewColumnWidth(min: 250, ideal: 300, max: 400)
         } detail: {
             detailContent
         }
@@ -18,11 +19,11 @@ struct HomeView: View {
             socketStatusView
         }
         .sheet(isPresented: $viewModel.showCreateChatSheet) {
-            Text("Create Chat View Stub")
+            CreateChatView(viewModel: viewModel)
         }
         .sheet(isPresented: $viewModel.showInviteSheet) {
             if let chat = viewModel.selectedChatForInvite {
-                Text("Invite View Stub for \(chat.title ?? "")")
+                InviteUsersView(chat: chat)
             }
         }
         .alert("Error", isPresented: $viewModel.hasError) {
@@ -99,6 +100,7 @@ struct HomeView: View {
         }
         .contextMenu {
             Button {
+                viewModel.openInviteSheet(for: chat)
             } label: {
                 Label("Invite Users", systemImage: "person.badge.plus")
             }
@@ -110,17 +112,21 @@ struct HomeView: View {
             Text("Channels")
             Spacer()
             Button {
+                viewModel.showCreateChatSheet = true
             } label: {
                 Image(systemName: "plus.circle.fill")
                     .imageScale(.medium)
+                    .foregroundStyle(.blue)
             }
             .buttonStyle(.plain)
         }
+        .padding(.vertical, 4)
     }
     
     private var menuButton: some View {
         Menu {
             Button {
+                viewModel.showCreateChatSheet = true
             } label: {
                 Label("New Chat", systemImage: "plus.bubble")
             }

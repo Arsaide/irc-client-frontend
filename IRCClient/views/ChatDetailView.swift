@@ -4,6 +4,8 @@ struct ChatDetailView: View {
     @StateObject private var viewModel: ChatDetailViewModel
     @FocusState private var isInputFocused: Bool
     
+    private let bottomID = "BOTTOM_ANCHOR"
+    
     init(chat: Chat, myUserId: String) {
         _viewModel = StateObject(wrappedValue: ChatDetailViewModel(chat: chat, myUserId: myUserId))
     }
@@ -14,7 +16,9 @@ struct ChatDetailView: View {
             
             Divider()
             
-            messagesScrollView
+            ScrollViewReader { proxy in
+                messagesScrollView(proxy: proxy)
+            }
             
             Divider()
             
@@ -28,6 +32,7 @@ struct ChatDetailView: View {
         }
         .onAppear {
             viewModel.onAppear()
+            isInputFocused = true
         }
         .onDisappear {
             viewModel.onDisappear()
@@ -57,46 +62,72 @@ struct ChatDetailView: View {
         .background(.ultraThinMaterial)
     }
     
-    private var messagesScrollView: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                if viewModel.isLoading {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                } else if viewModel.messages.isEmpty {
-                    ContentUnavailableView(
-                        "No Messages",
-                        systemImage: "bubble.left",
-                        description: Text("Be the first to send a message!")
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    LazyVStack(spacing: 12) {
-                        ForEach(viewModel.messages) { message in
-                            MessageBubble(
-                                message: message,
-                                isMy: viewModel.isMyMessage(message)
-                            )
-                            .id(message.id)
-                        }
-                    }
+    private func messagesScrollView(proxy: ScrollViewProxy) -> some View {
+        ScrollView {
+            if viewModel.isLoading && viewModel.messages.isEmpty {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
                     .padding()
-                }
-            }
-            .onChange(of: viewModel.messages.count) { oldValue, newValue in
-                if let lastId = viewModel.messages.last?.id {
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        proxy.scrollTo(lastId, anchor: .bottom)
+            } else if viewModel.messages.isEmpty {
+                ContentUnavailableView(
+                    "No Messages",
+                    systemImage: "bubble.left",
+                    description: Text("Be the first to send a message!")
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.top, 0)
+            } else {
+                LazyVStack(spacing: 12) {
+                    ForEach(viewModel.messages) { message in
+                        MessageBubble(
+                            message: message,
+                            isMy: viewModel.isMyMessage(message)
+                        )
+                        .id(message.id)
                     }
                 }
+                .padding()
             }
-            .onAppear {
-                if let lastId = viewModel.messages.last?.id {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        proxy.scrollTo(lastId, anchor: .bottom)
-                    }
+        }
+        .onChange(of: viewModel.messages.count) { oldValue, newValue in
+            if newValue > oldValue {
+                scrollToLastMessage(proxy: proxy, animated: true)
+            }
+        }
+        .onChange(of: isInputFocused) { _, focused in
+            if focused {
+                scrollToLastMessage(proxy: proxy, animated: true)
+            }
+        }
+        .onChange(of: viewModel.isLoading) { _, loading in
+            if !loading {
+                scrollToLastMessage(proxy: proxy, animated: false)
+            }
+        }
+    }
+        
+    private func scrollToLastMessage(proxy: ScrollViewProxy, animated: Bool) {
+        guard let lastId = viewModel.messages.last?.id else { return }
+            
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            if animated {
+                withAnimation(.easeOut(duration: 0.3)) {
+                    proxy.scrollTo(lastId, anchor: .bottom)
                 }
+            } else {
+                proxy.scrollTo(lastId, anchor: .bottom)
+            }
+        }
+    }
+        
+    private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool) {
+        DispatchQueue.main.async {
+            if animated {
+                withAnimation(.easeOut(duration: 0.3)) {
+                    proxy.scrollTo(bottomID, anchor: .bottom)
+                }
+            } else {
+                proxy.scrollTo(bottomID, anchor: .bottom)
             }
         }
     }
@@ -134,6 +165,13 @@ struct ChatDetailView: View {
         }
         .padding()
         .background(.ultraThinMaterial)
+    }
+    
+    private func sendMessage() {
+        if !viewModel.newMessageText.isEmpty {
+            viewModel.sendMessage()
+            isInputFocused = true
+        }
     }
 }
 

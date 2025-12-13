@@ -12,6 +12,8 @@ class ChatDetailViewModel: BaseViewModel {
     private let messageService = ServiceFactory.makeMessageService()
     private let socketManager = SocketManagerWrapper.shared
     
+    private var socketHandlerId: UUID?
+    
     init(chat: Chat, myUserId: String) {
         self.chat = chat
         self.myUserId = myUserId
@@ -19,54 +21,63 @@ class ChatDetailViewModel: BaseViewModel {
     }
     
     func onAppear() {
-        socketManager.joinRoom(chatId: chat.id)
+        print("ChatDetailViewModel onAppear for chat: \(chat.id)")
         
-        // 1. ВАЖНО: Удаляем старый слушатель, чтобы сообщения не дублировались при переходе туда-сюда
-        socketManager.off("newMessage")
+        cleanup()
+        
+        socketManager.joinRoom(chatId: chat.id)
         
         loadHistory()
         
-        socketManager.onNewMessage { [weak self] data in
-            guard let self = self else { return }
+        socketHandlerId = socketManager.onNewMessage { [weak self] data in
+            guard let self = self else {
+                print("ChatDetailViewModel: Self is nil in onNewMessage")
+                return
+            }
             
-            print("📩 RAW SOCKET DATA: \(data)")
+            print("ChatDetailViewModel: Received new message data in chat \(self.chat.id)")
             
             do {
                 let jsonData = try JSONSerialization.data(withJSONObject: data)
                 let message = try JSONDecoder().decode(Message.self, from: jsonData)
                 
+                print("ChatDetailViewModel: Decoded message: \(message.id) for chat: \(message.chatId)")
+                
+                guard message.chatId == self.chat.id else {
+                    print("ChatDetailViewModel: Message is for different chat (\(message.chatId)), current is \(self.chat.id), ignoring")
+                    return
+                }
+                
                 DispatchQueue.main.async {
-                    let isAlreadyShown = self.messages.contains {
-                        $0.id == message.id ||
-                        ($0.text == message.text && $0.user.id == message.user.id)
-                    }
-                    
-                    if !isAlreadyShown {
-                        print("Message added to UI: \(message.text)")
+                    if !self.messages.contains(where: { $0.id == message.id }) {
+                        print("ChatDetailViewModel: Adding message \(message.id) to UI")
                         withAnimation {
                             self.messages.append(message)
                         }
                     } else {
-                        print("Message duplicate skipped")
+                        print("ChatDetailViewModel: Message \(message.id) already exists, skipping")
                     }
                 }
-            } catch let DecodingError.dataCorrupted(context) {
-                print("[DECODE ERROR] (Data): \(context)")
-            } catch let DecodingError.keyNotFound(key, context) {
-                print("[DECODE ERROR] (Key not found): '\(key.stringValue)' не найдено. Context: \(context.debugDescription)")
-            } catch let DecodingError.valueNotFound(value, context) {
-                print("[DECODE ERROR] (Value not found): '\(value)' не найдено. Context: \(context.debugDescription)")
-            } catch let DecodingError.typeMismatch(type, context) {
-                print("[DECODE ERROR] (Type mismatch): Ожидался '\(type)', а пришло другое. Field: \(context.codingPath.last?.stringValue ?? "unknown"). Context: \(context.debugDescription)")
             } catch {
-                print("[UNKNOWN ERROR]: \(error)")
+                print("[ERROR] ChatDetailViewModel: Failed to decode message: \(error)")
             }
         }
+        
+        print("ChatDetailViewModel: Created handler with ID: \(socketHandlerId?.uuidString ?? "nil")")
     }
     
     func onDisappear() {
-        socketManager.leaveRoom(chatId: chat.id)
-        socketManager.off("newMessage")
+        print("ChatDetailViewModel onDisappear for chat: \(chat.id)")
+        cleanup()
+    }
+    
+    private func cleanup() {
+        if let handlerId = socketHandlerId {
+            print("ChatDetailViewModel: Cleaning up handlers for chat: \(chat.id)")
+            socketManager.leaveRoom(chatId: chat.id)
+            socketManager.removeHandler(handlerId)
+            socketHandlerId = nil
+        }
     }
     
     func loadHistory() {
@@ -80,46 +91,33 @@ class ChatDetailViewModel: BaseViewModel {
                         withAnimation {
                             self.messages = msgs
                         }
+                        print("ChatDetailViewModel: Loaded \(msgs.count) messages for chat \(self.chat.id)")
                     }
                 case .failure(let error):
-                    print("History load error: \(error)")
+                    print("ChatDetailViewModel: History load error: \(error)")
+                    self.showError("Failed to load messages")
                 }
             }
         }
     }
     
     func sendMessage() {
-        guard !newMessageText.isEmpty else { return }
+        let trimmed = newMessageText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
         
-        let target = chat.ircChannelName ?? ("#" + (chat.title ?? "unknown"))
-        let textToSend = newMessageText
-        
+        let textToSend = trimmed
         newMessageText = ""
         
-        let tempMessage = Message(
-            id: UUID().uuidString,
-            text: textToSend,
-            createdAt: ISO8601DateFormatter().string(from: Date()),
-            user: MessageUser(id: myUserId, name: "Me", ircNickname: nil)
-        )
-        
-        withAnimation {
-            self.messages.append(tempMessage)
-        }
-        
-        messageService.sendMessage(target: target, text: textToSend) { [weak self] result in
+        messageService.sendMessage(chatId: chat.id, text: textToSend) { [weak self] result in
             guard let self = self else { return }
             
             switch result {
             case .success:
-                print("Message sent successfully")
+                print("ChatDetailViewModel: Message sent successfully")
                 
             case .failure(let error):
-                print("Failed to send: \(error)")
+                print("ChatDetailViewModel: Failed to send: \(error)")
                 DispatchQueue.main.async {
-                    withAnimation {
-                        self.messages.removeAll(where: { $0.id == tempMessage.id })
-                    }
                     self.newMessageText = textToSend
                     self.showError("Failed to send message")
                 }
